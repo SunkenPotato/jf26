@@ -22,29 +22,29 @@ std::chrono::time_point<std::chrono::high_resolution_clock> program_start;
 class Intervall2Bin
 {
 public:
-    Intervall2Bin(int batch_laenge, int max_quantiles)
+    Intervall2Bin(int batch_laenge, int max_quantile)
         : batch_laenge(batch_laenge),
-          max_quantiles(max_quantiles),
-          vergleichsdaten_laenge(max_quantiles * max_quantiles)
+          max_quantile(max_quantile),
+          vergleichsdaten_laenge(max_quantile * max_quantile)
     {
-        quantile.reserve(max_quantiles);
+        quantile.reserve(max_quantile);
         vergleichsdaten.reserve(vergleichsdaten_laenge);
-        NOT_READY.clear(); 
+        NOT_READY.clear();
     }
     std::vector<unsigned int> take_intervall(unsigned int intervall);
     void fill_buffer(unsigned char *buf, int n);
     int batch_laenge = 1000; // Menge an Intervallen, die aufgenommen werden, bevor ein Signifikanztest ausgeführt wird
-    int max_quantiles;       // Maximale Anzahl an Quantilen, in die die Exp. Funktion eingeteilt wird 
+    int max_quantile;        // Maximale Anzahl an Quantilen, in die die Exp. Funktion eingeteilt wird
     std::vector<unsigned int> aktuelle_bins;
 
 private:
     void bins_erstellen();
     unsigned int welcher_bin(double intervall);
     bool t_test();
-    int referenz_zähler_vergleichsdaten = 0; // Iterator für Länge der Vergleichsdaten
-    std::vector<unsigned int> vergleichsdaten;     // Daten, um erwartete akute Zerfallsrate zu bestimmen
+    int referenz_zähler_vergleichsdaten = 0;   // Iterator für Länge der Vergleichsdaten
+    std::vector<unsigned int> vergleichsdaten; // Daten, um erwartete akute Zerfallsrate zu bestimmen
     // Wird zurückgegeben, wenn noch das Programm noch nicht bereit ist (zB wenn die Vergleichsdaten nicht groß genug sind)
-    std::vector<unsigned int> NOT_READY; 
+    std::vector<unsigned int> NOT_READY;
     int vergleichsdaten_laenge;
     std::vector<unsigned int> quantile;
     std::vector<unsigned int> intervalle_post_vergleichsverteilung;
@@ -102,19 +102,19 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
 }
 
 // Nimmt die Vergleichsdaten, schätzt damit das Lamda, also die Zerfallsrate der Dichtefunktion
-// der Exponentialfunktion, und teilt diese in "max_quantiles"
-// quantile ein, die alle das Integral 1 / max_quantiles haben und speichert diese in dem Vektor "quantiles"
+// der Exponentialfunktion, und teilt diese in "max_quantile"
+// quantile ein, die alle das Integral 1 / max_quantile haben und speichert diese in dem Vektor "quantiles"
 void Intervall2Bin::bins_erstellen()
 {
     // Lambda aus Vergleichsdaten schätzen
     double mean = std::accumulate(vergleichsdaten.begin(), vergleichsdaten.end(), 0.0) / vergleichsdaten.size();
     double lambda_hat = 1.0 / mean;
 
-    // Quantile für gleichwahrscheinliche Bins
-    quantile.resize(max_quantiles);
-    for (int k = 1; k <= max_quantiles; ++k)
+    // Quantile für gleichwahrscheinliche Quantile
+    quantile.resize(max_quantile - 1);
+    for (int k = 1; k < max_quantile; ++k)
     {
-        double p = static_cast<double>(k) / max_quantiles; // p = k/n
+        double p = static_cast<double>(k) / max_quantile;
         quantile[k - 1] = -std::log(1.0 - p) / lambda_hat;
     }
 }
@@ -124,10 +124,10 @@ unsigned int Intervall2Bin::welcher_bin(double intervall)
 {
     unsigned int index;
 
-    // Wenn das Intervall größer als der Wert vom letzten Quantil ist, wird in index die Anzahl der Quantile - 1 gespeichert
+    // Wenn das Intervall größer als die untere Grenze vom letzten Quantil ist, wird in index die Anzahl der Quantile - 1 gespeichert
     if (intervall > quantile.back())
     {
-        index = max_quantiles - 1;
+        index = max_quantile - 1;
     }
     else
     {
