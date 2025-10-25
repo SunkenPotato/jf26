@@ -57,11 +57,9 @@ private:
 // diese Methode als letztes aufgerufen wurde, befindet und speichert diesem wert in bit_liste
 std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
 {
-    std::cout << "take_intervall called" << std::endl;
-    // Überprüfen, ob genug Vergleichsdaten vorhanden
+     // Überprüfen, ob genug Vergleichsdaten vorhanden
     if (referenz_zähler_vergleichsdaten < vergleichsdaten_laenge)
     {
-        std::cout << "ti.1.true" << std::endl;
         // Vergleichsdaten das neue Intervall hinzufügen
         vergleichsdaten.push_back(intervall);
         referenz_zähler_vergleichsdaten++;
@@ -69,7 +67,6 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
     }
     else
     {
-        std::cout << "ti.1.false" << std::endl;
         // Wenn Exponentialverteilung noch nicht in Quantile eingeteilt wurde, einteilen
         if (quantile.empty())
             bins_erstellen();
@@ -83,11 +80,10 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
 
         if (post_vergleichsdaten_zähler % batch_laenge == 0)
         {
-            std::cout << "ti.2.true" << std::endl;
             // Ausführung eines Signifikanztests
             if (t_test())
             {
-                std::cout << "ti.3.true" << std::endl;
+
                 // Wenn Vergleichsverteilung zu den neuen Intervallen signifikant unterschiedlich
                 referenz_zähler_vergleichsdaten = 0;
                 quantile.clear();
@@ -98,11 +94,9 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
             }
             else
             {
-                std::cout << "ti.3.false" << std::endl;
                 return aktuelle_bins;
             }
         }
-        std::cout << "ti.2.false" << std::endl;
         return NOT_READY;
     }
 }
