@@ -1,4 +1,5 @@
 #include <csignal>
+#include <iterator>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -32,7 +33,6 @@ public:
         NOT_READY.clear();
     }
     std::vector<unsigned int> take_intervall(unsigned int intervall);
-    void fill_buffer(unsigned char *buf, int n);
     int batch_laenge = 1000; // Menge an Intervallen, die aufgenommen werden, bevor ein Signifikanztest ausgeführt wird
     int max_quantile;        // Maximale Anzahl an Quantilen, in die die Exp. Funktion eingeteilt wird
     std::vector<unsigned int> aktuelle_bins;
@@ -61,6 +61,7 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
     // Überprüfen, ob genug Vergleichsdaten vorhanden
     if (referenz_zähler_vergleichsdaten < vergleichsdaten_laenge)
     {
+        std::cout << "ti.1.true" << std::endl;
         // Vergleichsdaten das neue Intervall hinzufügen
         vergleichsdaten.push_back(intervall);
         referenz_zähler_vergleichsdaten++;
@@ -68,6 +69,7 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
     }
     else
     {
+        std::cout << "ti.1.false" << std::endl;
         // Wenn Exponentialverteilung noch nicht in Quantile eingeteilt wurde, einteilen
         if (quantile.empty())
             bins_erstellen();
@@ -81,9 +83,11 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
 
         if (post_vergleichsdaten_zähler % batch_laenge == 0)
         {
+            std::cout << "ti.2.true" << std::endl;
             // Ausführung eines Signifikanztests
             if (t_test())
             {
+                std::cout << "ti.3.true" << std::endl;
                 // Wenn Vergleichsverteilung zu den neuen Intervallen signifikant unterschiedlich
                 referenz_zähler_vergleichsdaten = 0;
                 quantile.clear();
@@ -94,9 +98,11 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
             }
             else
             {
+                std::cout << "ti.3.false" << std::endl;
                 return aktuelle_bins;
             }
         }
+        std::cout << "ti.2.false" << std::endl;
         return NOT_READY;
     }
 }
@@ -168,23 +174,29 @@ bool Intervall2Bin::t_test()
     return t > t_crit;
 }
 
-void Intervall2Bin::fill_buffer(unsigned char *buf, int n)
+std::mutex buffer_lock;
+std::vector<unsigned int> bin_buffer;
+
+void fill_buffer(unsigned char *buf, int n)
 {
-    // TODO(SunkenPotato): actually fill this with random bytes.
+    // we do not lock this because the caller is expected to lock to avoid deadlocks.
     for (int i = 0; i < n; i += 1)
     {
-        buf[i] = aktuelle_bins.back();
-        aktuelle_bins.pop_back();
+        buf[i] = bin_buffer.back();
+        bin_buffer.pop_back();
     }
 }
 
 std::mutex converter_mutex;
-Intervall2Bin converter;
+// TODO(SunkenPotato): set to 100 for release
+// 16 (2^4) quantiles will give us 4 bits per byte, which means that every byte will look like: 0000XXXX where X is a random bit.
+// to get actual, full bytes, we'd have to set the #quantiles to 2^8, which will require (2^8)^2 = 35536 comparison intervals (takes forever in the average environment, since 2^4 quantiles already takes forever)
+Intervall2Bin converter = Intervall2Bin(10, 16);
 
 void initRoutes(httplib::Server &svr)
 {
     svr.Get("/", [](const httplib::Request &req, httplib::Response &res)
-            {
+    {
         size_t n = 32;
 
         if (req.has_param("amount")) {
@@ -201,14 +213,16 @@ void initRoutes(httplib::Server &svr)
         }
 
         unsigned char buffer[4096];
-        std::lock_guard<std::mutex> lock_guard(converter_mutex);
-        if (converter.aktuelle_bins.size() < n) {
+        std::unique_lock lock(buffer_lock);
+        if (bin_buffer.size() < n) {
             res.status = 503;
-            res.set_content("That amount of bytes is not available", "text/plain");
+            res.set_content("That amount of bytes is not available\n", "text/plain");
             return;
         }
 
-        converter.fill_buffer(buffer, n);
+        fill_buffer(buffer, n);
+        // we can now unlock since we do not use the buffer
+        lock.unlock();
 
         std::string_view body(reinterpret_cast<const char*>(buffer), n);
         res.set_content_provider(n, "application/octet-stream", [buffer](size_t offset, size_t len, httplib::DataSink &sink) {
@@ -217,7 +231,8 @@ void initRoutes(httplib::Server &svr)
         });
         res.status = 200;
 
-        return; });
+        return;
+    });
 }
 
 std::optional<std::chrono::time_point<std::chrono::high_resolution_clock>> last_particle;
@@ -238,7 +253,13 @@ void gpioHook(int gpio, int level, unsigned int tick)
             unsigned int interval = std::chrono::duration_cast<std::chrono::microseconds>(now - *last_particle).count();
             last_particle = now;
             std::lock_guard guard(converter_mutex);
-            converter.take_intervall(interval);
+            std::vector bins = converter.take_intervall(interval);
+            if (bins.size() == 0) {
+                return;
+            }
+
+            std::lock_guard bin_buf_guard(buffer_lock);
+            bin_buffer.insert(bin_buffer.end(), std::make_move_iterator(bins.begin()), std::make_move_iterator(bins.end()));
         }
     }
 }
