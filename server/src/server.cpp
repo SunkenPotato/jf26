@@ -10,6 +10,9 @@
 // + n has not been provided.
 #define DEFAULT_HTTP_BYTES 32
 
+#define HTTP_ADDRESS "127.0.0.1"
+#define HTTP_PORT 8000
+
 // The timestamp indicating when the program started. This is used as an anchor point for measuring intervals later on.
 std::chrono::time_point<std::chrono::high_resolution_clock> program_start;
 
@@ -149,7 +152,7 @@ int main()
     httplib::Server svr;
     initRoutes(svr);
 
-    svr.listen("127.0.0.1", 8000);
+    svr.listen(HTTP_ADDRESS, HTTP_PORT);
 
     gpioTerminate();
     return 0;
