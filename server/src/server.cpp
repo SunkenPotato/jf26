@@ -1,14 +1,26 @@
 #include "I2B.h"
 
+// The interrupt GPIO pin connected to the Geiger counter.
 #define GPIO_PIN 17
+// The maximum amount of bytes a client is allowed to request per HTTP request. Default is 4KiB.
+#define MAX_HTTP_BYTES 4096
+// The amount of bytes the server defaults to if:
+// + n > MAX_HTTP_BYTES
+// or
+// + n has not been provided.
+#define DEFAULT_HTTP_BYTES 32
 
-// volatile sig_atomic_t keep_running = 1;
-
+// The timestamp indicating when the program started. This is used as an anchor point for measuring intervals later on.
 std::chrono::time_point<std::chrono::high_resolution_clock> program_start;
 
 std::mutex buffer_lock;
+// The quantile number buffer. Stores the recently obtained quantile numbers via `Intervall2Bin::take_intervall`.
 std::vector<unsigned int> bin_buffer;
 
+// Fill the given buffer with `n` bytes. It is up to the caller to ensure the following soundness predicates are valid:
+// + The quantile buffer is supposed to have been locked.
+// + The quantile buffer has at least n * 2 bytes.
+// + `buf` has at least n chars space.
 void fill_buffer(unsigned char *buf, int n)
 {
     // we do not lock this because the caller is expected to lock to avoid deadlocks.
@@ -16,24 +28,22 @@ void fill_buffer(unsigned char *buf, int n)
     {
         unsigned char c = bin_buffer.back();
         bin_buffer.pop_back();
-        // if there is another bin (quantile) number in the buffer, we amalgamate both so that we don't have half empty bytes
-        if (bin_buffer.size() > 0) {
-            // shift four to the right (since we've specified 2^4 quantiles, the quantile number will be in the last four bits)
-            c <<= 4;
-            // the last four of c will be empty and the first four of bin_buffer.back() will be empty, so we just use OR.
-            c |= bin_buffer.back();
-            bin_buffer.pop_back();
-        }
+
+        // shift four to the right (since we've specified 2^4 quantiles, the quantile number will be in the last four bits)
+        c <<= 4;
+        // the last four of c will be empty and the first four of bin_buffer.back() will be empty, so we just use OR.
+        c |= bin_buffer.back();
+        bin_buffer.pop_back();
 
         buf[i] = c;
     }
 }
 
 std::mutex converter_mutex;
-// TODO(SunkenPotato): set to 100 for release
 // 16 (2^4) quantiles will give us 4 bits per byte, which means that every byte will look like: 0000XXXX where X is a random bit.
-// to get actual, full bytes, we'd have to set the #quantiles to 2^8, which will require (2^8)^2 = 35536 comparison intervals (takes forever in the average environment, since 2^4 quantiles already takes forever)
-Intervall2Bin converter = Intervall2Bin(10, 16);
+// to get actual, full bytes, we'd have to set the #quantiles to 2^8, which will require (2^8)^2 = 35536 comparison intervals
+// (takes forever in the average environment, since 2^4 quantiles already takes forever), so we "cheat" and melt two bytes into one.
+Intervall2Bin converter = Intervall2Bin(100, 16);
 
 void initRoutes(httplib::Server &svr)
 {
@@ -44,9 +54,9 @@ void initRoutes(httplib::Server &svr)
         if (req.has_param("amount")) {
             try {
                 n = std::stoi(req.get_param_value("amount"));
-                if (n <= 0 || n >= 4096) n = 32;
+                if (n <= 0 || n >= MAX_HTTP_BYTES) n = 32;
             } catch (...) {
-                n = 32;
+                n = DEFAULT_HTTP_BYTES;
             }
         } else {
             res.status = 400;
@@ -56,7 +66,7 @@ void initRoutes(httplib::Server &svr)
 
         unsigned char buffer[4096];
         std::unique_lock lock(buffer_lock);
-        if (bin_buffer.size() < n) {
+        if (bin_buffer.size() * 2 < n) {
             res.status = 503;
             res.set_content("That amount of bytes is not available\n", "text/plain");
             return;
@@ -77,6 +87,7 @@ void initRoutes(httplib::Server &svr)
     });
 }
 
+// The timestamp when the last particle was detected.
 std::optional<std::chrono::time_point<std::chrono::high_resolution_clock>> last_particle;
 
 void gpioHook(int gpio, int level, unsigned int tick)
