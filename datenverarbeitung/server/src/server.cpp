@@ -16,8 +16,11 @@ void fill_buffer(unsigned char *buf, int n)
     {
         unsigned char c = bin_buffer.back();
         bin_buffer.pop_back();
+        // if there is another bin (quantile) number in the buffer, we amalgamate both so that we don't have half empty bytes
         if (bin_buffer.size() > 0) {
+            // shift four to the right (since we've specified 2^4 quantiles, the quantile number will be in the last four bits)
             c <<= 4;
+            // the last four of c will be empty and the first four of bin_buffer.back() will be empty, so we just use OR.
             c |= bin_buffer.back();
             bin_buffer.pop_back();
         }
