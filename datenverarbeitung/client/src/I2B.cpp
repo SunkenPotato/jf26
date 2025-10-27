@@ -176,8 +176,15 @@ void fill_buffer(unsigned char *buf, int n)
     // we do not lock this because the caller is expected to lock to avoid deadlocks.
     for (int i = 0; i < n; i += 1)
     {
-        buf[i] = bin_buffer.back();
+        unsigned char c = bin_buffer.back();
         bin_buffer.pop_back();
+        if (bin_buffer.size() > 0) {
+            c <<= 4;
+            c |= bin_buffer.back();
+            bin_buffer.pop_back();
+        }
+
+        buf[i] = c;
     }
 }
 
@@ -235,7 +242,6 @@ void gpioHook(int gpio, int level, unsigned int tick)
 {
     if (level == 0)
     {
-        std::cout << "got a particle" << std::endl;
         if (!last_particle)
         {
             last_particle = std::chrono::high_resolution_clock::now();
@@ -262,17 +268,17 @@ int initGpio()
 {
     if (gpioInitialise() < 0)
     {
-        std::cout << "Failed to call gpioInitialise" << std::endl;
+        std::cerr << "Failed to call gpioInitialise" << std::endl;
         return 1;
     };
     if (gpioSetMode(GPIO_PIN, PI_INPUT) != 0)
     {
-        std::cout << "Failed to set input mode" << std::endl;
+        std::cerr << "Failed to set input mode" << std::endl;
         return 2;
     }
     if (gpioSetAlertFunc(GPIO_PIN, gpioHook) != 0)
     {
-        std::cout << "Failed to set alert function" << std::endl;
+        std::cerr << "Failed to set alert function" << std::endl;
         return 3;
     }
 
@@ -284,7 +290,7 @@ int main()
     program_start = std::chrono::high_resolution_clock::now();
     if (initGpio() != 0)
     {
-        std::cout << "Failed to initialise GPIO" << std::endl;
+        std::cerr << "Failed to initialise GPIO" << std::endl;
         gpioTerminate();
         return 1;
     }
