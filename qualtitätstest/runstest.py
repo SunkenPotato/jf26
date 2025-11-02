@@ -1,9 +1,6 @@
 import numpy as np
 from scipy.stats import norm
-
-with open('data.bin', 'rb') as file:
-    data = np.frombuffer(file.read(), dtype=np.uint8)
-    data = data & 1
+import random
 
 def runs_test_binary(data):
     n1 = np.sum(data == 1)
@@ -15,4 +12,9 @@ def runs_test_binary(data):
     p = 2 * (1 - norm.cdf(abs(z)))
     return p
 
-print(runs_test_binary(data))
+with open('datatest.bin', 'rb') as file:
+    datatrng = np.frombuffer(file.read(), dtype=np.uint8)
+    datatrng = datatrng & 1
+
+
+print(f"TRNG p-score: {runs_test_binary(datatrng)}")
