@@ -158,6 +158,6 @@ bool Intervall2Bin::t_test()
     double t = std::abs(mean_base - mean_interv) / std::sqrt(var_base / vergleichsdaten.size() + var_interv / intervalle_post_vergleichsverteilung.size());
 
     // Gibt True zurück, wenn signifikant unterschiedlich, sonst false
-    const double t_crit = 2.58; // ungefähr 99% Konfidenz
+    const double t_crit = 1.96; // ungefähr 95% Konfidenz
     return t > t_crit;
 }
