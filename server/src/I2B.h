@@ -8,41 +8,44 @@
 #include <numeric>
 #include <algorithm>
 #include <chrono>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 
-#include <pigpio.h>
+//#include <pigpio.h>
 #include "../../include/httplib.h"
 
 using namespace std;
 
 class Intervall2Bin
 {
-public:
-    Intervall2Bin(int batch_laenge, int max_quantile)
-        : batch_laenge(batch_laenge),
-          max_quantile(max_quantile),
-          vergleichsdaten_laenge(max_quantile * max_quantile)
-    {
-        quantile.reserve(max_quantile);
-        vergleichsdaten.reserve(vergleichsdaten_laenge);
-        NOT_READY.clear();
-    }
-    std::vector<unsigned int> take_intervall(unsigned int intervall);
-    int batch_laenge = 1000; // Menge an Intervallen, die aufgenommen werden, bevor ein Signifikanztest ausgeführt wird
-    int max_quantile;        // Maximale Anzahl an Quantilen, in die die Exp. Funktion eingeteilt wird
-    std::vector<unsigned int> aktuelle_bins;
+    public:
+        Intervall2Bin(int batch_laenge, int max_quantile)
+            : batch_laenge(batch_laenge),
+            max_quantile(max_quantile),
+            vergleichsdaten_laenge(max_quantile * max_quantile)
+        {
+            quantile.reserve(max_quantile);
+            vergleichsdaten.reserve(vergleichsdaten_laenge);
+            NOT_READY.clear();
+        }
+        std::vector<unsigned int> take_intervall(unsigned int intervall);
+        int batch_laenge = 1000; // Menge an Intervallen, die aufgenommen werden, bevor ein Signifikanztest ausgeführt wird
+        int max_quantile;        // Maximale Anzahl an Quantilen, in die die Exp. Funktion eingeteilt wird
+        std::vector<unsigned int> aktuelle_bins;
 
-private:
-    void bins_erstellen();
-    unsigned int welcher_bin(double intervall);
-    bool t_test();
-    int referenz_zähler_vergleichsdaten = 0;   // Iterator für Länge der Vergleichsdaten
-    std::vector<unsigned int> vergleichsdaten; // Daten, um erwartete akute Zerfallsrate zu bestimmen
-    // Wird zurückgegeben, wenn noch das Programm noch nicht bereit ist (zB wenn die Vergleichsdaten nicht groß genug sind)
-    std::vector<unsigned int> NOT_READY;
-    int vergleichsdaten_laenge;
-    std::vector<unsigned int> quantile;
-    std::vector<unsigned int> intervalle_post_vergleichsverteilung;
-    int post_vergleichsdaten_zähler = 0;
+    private:
+        void bins_erstellen();
+        unsigned int welcher_bin(double intervall);
+        bool t_test();
+        int referenz_zähler_vergleichsdaten = 0;   // Iterator für Länge der Vergleichsdaten
+        std::vector<unsigned int> vergleichsdaten; // Daten, um erwartete akute Zerfallsrate zu bestimmen
+        // Wird zurückgegeben, wenn noch das Programm noch nicht bereit ist (zB wenn die Vergleichsdaten nicht groß genug sind)
+        std::vector<unsigned int> NOT_READY;
+        int vergleichsdaten_laenge;
+        std::vector<unsigned int> quantile;
+        std::vector<unsigned int> intervalle_post_vergleichsverteilung;
+        int post_vergleichsdaten_zähler = 0;
 };
 
 // Nimmt Intervalle in Mikrosekunden, sammelt zunächst Vergleichsdaten,
@@ -62,9 +65,12 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
     else
     {
         // Wenn Exponentialverteilung noch nicht in Quantile eingeteilt wurde, einteilen
-        if (quantile.empty())
+        if (quantile.empty()){
+            zeitstempel("Neue Batch");
             bins_erstellen();
-
+            std::vector<double> quantile_d(quantile.begin(), quantile.end());
+            zeitstempel("Quantile", quantile_d);
+        }
         intervalle_post_vergleichsverteilung.push_back(intervall);
 
         // Lässt prüfen, in welchem Quantil sich das neue Intervall befindet
@@ -103,6 +109,7 @@ void Intervall2Bin::bins_erstellen()
     // Lambda aus Vergleichsdaten schätzen
     double mean = std::accumulate(vergleichsdaten.begin(), vergleichsdaten.end(), 0.0) / vergleichsdaten.size();
     double lambda_hat = 1.0 / mean;
+    zeitstempel("Zerfallsrate", {lambda_hat});
 
     // Quantile für gleichwahrscheinliche Quantile
     quantile.resize(max_quantile - 1);
@@ -156,8 +163,25 @@ bool Intervall2Bin::t_test()
 
     // Berechnet den t-Wert
     double t = std::abs(mean_base - mean_interv) / std::sqrt(var_base / vergleichsdaten.size() + var_interv / intervalle_post_vergleichsverteilung.size());
+    zeitstempel("t-Wert", {t});
 
     // Gibt True zurück, wenn signifikant unterschiedlich, sonst false
     const double t_crit = 1.96; // ungefähr 95% Konfidenz
     return t > t_crit;
 }
+
+void zeitstempel(const std::string& typ, const std::vector<double>& daten = {}) {
+    std::ofstream params("../../qualitätstest/ergebnisparams.csv", std::ios::app);
+    if (!params.is_open()) return;
+
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = *std::localtime(&t);
+    params << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << "," << typ;
+
+    for (const auto& val : daten) {
+        params << "," << val;
+    }
+    params << "\n";
+}
+
