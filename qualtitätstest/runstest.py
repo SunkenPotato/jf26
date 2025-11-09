@@ -16,5 +16,4 @@ with open('datatest.bin', 'rb') as file:
     datatrng = np.frombuffer(file.read(), dtype=np.uint8)
     datatrng = datatrng & 1
 
-
 print(f"TRNG p-score: {runs_test_binary(datatrng)}")
