@@ -66,10 +66,8 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
     {
         // Wenn Exponentialverteilung noch nicht in Quantile eingeteilt wurde, einteilen
         if (quantile.empty()){
-            zeitstempel("Neue Batch");
             bins_erstellen();
             std::vector<double> quantile_d(quantile.begin(), quantile.end());
-            zeitstempel("Quantile", quantile_d);
         }
         intervalle_post_vergleichsverteilung.push_back(intervall);
 
@@ -109,7 +107,6 @@ void Intervall2Bin::bins_erstellen()
     // Lambda aus Vergleichsdaten schätzen
     double mean = std::accumulate(vergleichsdaten.begin(), vergleichsdaten.end(), 0.0) / vergleichsdaten.size();
     double lambda_hat = 1.0 / mean;
-    zeitstempel("Zerfallsrate", {lambda_hat});
 
     // Quantile für gleichwahrscheinliche Quantile
     quantile.resize(max_quantile - 1);
@@ -163,25 +160,11 @@ bool Intervall2Bin::t_test()
 
     // Berechnet den t-Wert
     double t = std::abs(mean_base - mean_interv) / std::sqrt(var_base / vergleichsdaten.size() + var_interv / intervalle_post_vergleichsverteilung.size());
-    zeitstempel("t-Wert", {t});
 
     // Gibt True zurück, wenn signifikant unterschiedlich, sonst false
     const double t_crit = 1.96; // ungefähr 95% Konfidenz
     return t > t_crit;
 }
 
-void zeitstempel(const std::string& typ, const std::vector<double>& daten = {}) {
-    std::ofstream params("../../qualitätstest/ergebnisparams.csv", std::ios::app);
-    if (!params.is_open()) return;
 
-    auto now = std::chrono::system_clock::now();
-    std::time_t t = std::chrono::system_clock::to_time_t(now);
-    std::tm tm = *std::localtime(&t);
-    params << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << "," << typ;
-
-    for (const auto& val : daten) {
-        params << "," << val;
-    }
-    params << "\n";
-}
 

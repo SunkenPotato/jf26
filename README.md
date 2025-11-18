@@ -28,6 +28,6 @@ Es gibt drei Verbindungen, die wir von der Strahlungsdetektor-Platine zum Raspbe
 In dieser Konfiguration musst du nur **eine** der beiden Platinen mit 5 Volt versorgen. Wenn du den Raspberry Pi mit einem normalen **Micro-USB-Netzteil** betreibst, wird die **Detektor-Platine über die hergestellten Verbindungen automatisch mitversorgt**.
 
 ## Anhänge
-+ Bild und Text inspiriert durch [Quelle](https://github.com/chrisys/background-radiation-monitor/blob/master/README.md).
-+ Jugend forscht Paper <!-- TODO wenn fertig hier paper einfügen -->
++ Bild und Text inspiriert durch [GitHub Link](https://github.com/chrisys/background-radiation-monitor/blob/master/README.md).
+>
 
