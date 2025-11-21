@@ -20,10 +20,10 @@ using namespace std;
 class Intervall2Bin
 {
     public:
-        Intervall2Bin(int batch_laenge, int max_quantile)
+        Intervall2Bin(int batch_laenge, int max_quantile, float sicherheitsgrad)
             : batch_laenge(batch_laenge),
             max_quantile(max_quantile),
-            vergleichsdaten_laenge(max_quantile * max_quantile)
+            vergleichsdaten_laenge(pow(max_quantile, sicherheitsgrad))
         {
             quantile.reserve(max_quantile);
             vergleichsdaten.reserve(vergleichsdaten_laenge);
@@ -92,6 +92,9 @@ std::vector<unsigned int> Intervall2Bin::take_intervall(unsigned int intervall)
             }
             else
             {
+                std::vector<unsigned int> tmp = std::move(aktuelle_bins); // move-inhalt
+                aktuelle_bins.clear(); // jetzt ist daten intern leer
+                return tmp;    // tmp wird zurückgegeben
                 return aktuelle_bins;
             }
         }
@@ -107,6 +110,7 @@ void Intervall2Bin::bins_erstellen()
     // Lambda aus Vergleichsdaten schätzen
     double mean = std::accumulate(vergleichsdaten.begin(), vergleichsdaten.end(), 0.0) / vergleichsdaten.size();
     double lambda_hat = 1.0 / mean;
+    cout << "geschätzteslambda" << lambda_hat << endl;
 
     // Quantile für gleichwahrscheinliche Quantile
     quantile.resize(max_quantile - 1);
@@ -162,7 +166,7 @@ bool Intervall2Bin::t_test()
     double t = std::abs(mean_base - mean_interv) / std::sqrt(var_base / vergleichsdaten.size() + var_interv / intervalle_post_vergleichsverteilung.size());
 
     // Gibt True zurück, wenn signifikant unterschiedlich, sonst false
-    const double t_crit = 1.96; // ungefähr 95% Konfidenz
+    const double t_crit = 1.645; // ungefähr 90% Konfidenz
     return t > t_crit;
 }
 

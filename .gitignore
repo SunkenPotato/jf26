@@ -3,3 +3,5 @@
 /.vscode
 flamegraph.svg
 **/*.a
+/server/src/debugmain.cpp
+/server/src/main
