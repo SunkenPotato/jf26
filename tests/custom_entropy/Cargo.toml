@@ -1,0 +1,8 @@
+[package]
+name = "custom_entropy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libc = "0.2.178"
+reqwest = { version = "0.12.24", features = ["blocking"] }

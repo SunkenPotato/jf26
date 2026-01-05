@@ -1,4 +1,7 @@
 /target
-.DS_Store
+/.DS_Store
+/.vscode
 flamegraph.svg
 **/*.a
+/server/src/debugmain.cpp
+/server/src/main

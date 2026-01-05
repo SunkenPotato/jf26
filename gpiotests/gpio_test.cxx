@@ -23,20 +23,31 @@ void signal_handler(int signum)
 
 int main()
 {
+    std::cout << "init GPIO" << std::endl;
     if (gpioInitialise() < 0)
     {
         std::cerr << "pigpio initialization failed" << std::endl;
         return 1;
     }
 
+    std::cout << "init SH" << std::endl;
     // Handle Ctrl+C clean exit
     std::signal(SIGINT, signal_handler);
 
     int pin = 17; // BCM pin number
-    gpioSetMode(pin, PI_INPUT);
+    std::cout << "set mode" << std::endl;
 
+    if (gpioSetMode(pin, PI_INPUT) != 0) {
+        std::cerr << "could not set input mode for bcm 17" << std::endl;
+        return 1;
+    }
+
+    std::cout << "reg clbk" << std::endl;
     // Register callback on falling edge
-    gpioSetAlertFunc(pin, count_callback);
+    if (gpioSetAlertFunc(pin, count_callback) != 0) {
+        std::cerr << "failed to set alert fn" << std::endl;
+        return 1;
+    };
 
     // Keep the program alive
     while (running)
