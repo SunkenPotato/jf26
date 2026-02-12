@@ -1,0 +1,19 @@
+refresh_rate: 30 seconds
+
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{d} [{h({l})}] {t} \\({T}\\): {m}{n}"
+
+  file:
+    kind: file
+    path: "log/latest.log"
+    encoder:
+      pattern: "{d} [{h({l})}] {t} \\({T}\\): {m}{n}"
+
+root:
+  level: info
+  appenders:
+    - stdout
+    - file
