@@ -1,24 +1,23 @@
-use std::{
-    env::var,
-    fs::{File, OpenOptions},
-    os::fd::AsRawFd,
-    time::Duration,
-};
+use std::env::var;
+#[cfg(feature = "mixer")]
+use std::fs::File;
 
-#[cfg(not(target_os = "linux"))]
-const _: () = compile_error!(
-    "This server uses operations which may not be available on platforms other than Linux (ioctl RNDADDENTROPY)."
-);
-
+#[cfg(feature = "mixer")]
 use anyhow::Context;
-use axum::{Json, extract::Query, response::Html, routing::get};
-use libc::{c_int, ioctl};
-use log::{error, info};
-use reqwest::{Client, Method, StatusCode};
+use axum::{Json, extract::Query, routing::get};
+use log::{error, info, warn};
+#[cfg(feature = "mixer")]
+use reqwest::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    fs::rename, net::TcpListener, runtime::Handle, spawn, task::block_in_place, time::sleep,
-};
+#[cfg(feature = "mixer")]
+use tokio::spawn;
+use tokio::{fs::rename, net::TcpListener};
+
+#[cfg(all(feature = "mixer", not(target_os = "linux")))]
+const _: () = compile_error!(
+    "The `server` feature may only be enabled on Linux, due system calls being made that may not exist on other platforms"
+);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,6 +27,11 @@ async fn main() -> anyhow::Result<()> {
 
     log4rs::init_file("log4rs.yaml", Default::default())?;
 
+    #[cfg(not(target_os = "linux"))]
+    warn!(
+        "Detected platform is not Linux, disabling TRNG sampling. No entropy will be added to /dev/random."
+    );
+
     info!("Hello, world!");
     info!("SERVER_ADDR={bind_addr};TARGET_ADDR={target_serv}");
 
@@ -35,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Bound listener to specified address");
 
+    #[cfg(feature = "mixer")]
     let _fetcher_task = spawn(fetcher_task(target_serv)?);
 
     let router = axum::Router::new()
@@ -80,14 +85,13 @@ async fn svr(Query(query): Query<ServerQuery>) -> Result<Json<MixerResponse>, St
     Ok(Json(MixerResponse { code }))
 }
 
-#[repr(C)]
-struct EntropyPoolPayload {
-    entropy_count: c_int,
-    buf_size: c_int,
-    buf: [u8; 512],
-}
-
+#[cfg(feature = "mixer")]
 fn fetcher_task(base: String) -> anyhow::Result<impl Future<Output = ()>> {
+    use std::fs::OpenOptions;
+
+    use reqwest::{Client, Method};
+    use tokio::{runtime::Handle, task::block_in_place};
+
     let entropy_pool = OpenOptions::new()
         .write(true)
         .open("/dev/random")
@@ -101,8 +105,22 @@ fn fetcher_task(base: String) -> anyhow::Result<impl Future<Output = ()>> {
     Ok(fetcher_task_inner(base, client, entropy_pool))
 }
 
+#[cfg(feature = "mixer")]
 async fn fetcher_task_inner(base: String, client: Client, pool: File) {
+    use libc::c_int;
+
+    #[repr(C)]
+    struct EntropyPoolPayload {
+        entropy_count: c_int,
+        buf_size: c_int,
+        buf: [u8; 512],
+    }
+
     loop {
+        use std::time::Duration;
+
+        use tokio::time::sleep;
+
         let response = match client.get(format!("{base}/?amount=512")).send().await {
             Ok(v) => v,
             Err(e) => {
@@ -131,6 +149,10 @@ async fn fetcher_task_inner(base: String, client: Client, pool: File) {
         };
 
         let Ok(slice) = (&bytes as &[u8]).try_into() else {
+            use std::time::Duration;
+
+            use tokio::time::sleep;
+
             sleep(Duration::from_mins(3)).await;
             continue;
         };
@@ -142,6 +164,10 @@ async fn fetcher_task_inner(base: String, client: Client, pool: File) {
         };
 
         unsafe {
+            use std::os::fd::AsRawFd;
+
+            use libc::ioctl;
+
             if ioctl(pool.as_raw_fd(), 1074287107, &payload) != 0 {
                 error!("Failed to inject custom entropy into system entropy pool");
             } else {
