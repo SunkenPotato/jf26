@@ -46,7 +46,7 @@ std::mutex converter_mutex;
 // 16 (2^4) quantiles will give us 4 bits per byte, which means that every byte will look like: 0000XXXX where X is a random bit.
 // to get actual, full bytes, we'd have to set the #quantiles to 2^8, which will require (2^8)^2 = 35536 comparison intervals
 // (takes forever in the average environment, since 2^4 quantiles already takes forever), so we "cheat" and melt two bytes into one.
-Intervall2Bin converter = Intervall2Bin(100, 16, 2.5);
+Intervall2Bin converter = Intervall2Bin(10, 16, 2.5);
 
 void initRoutes(httplib::Server &svr)
 {
