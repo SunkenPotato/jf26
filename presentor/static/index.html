@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+    <head>
+        <link rel="stylesheet" href="/index.css" />
+        <meta charset="utf-8" />
+    </head>
+    <body>
+        <script src="/index.js" defer></script>
+
+        <script
+            src="https://code.jquery.com/jquery-4.0.0.min.js"
+            integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao="
+            crossorigin="anonymous"
+        ></script>
+
+        <script src="https://unpkg.com/feather-icons"></script>
+
+        <div class="main-container">
+            <div class="center-container row-container">
+                <h1>Τύχη Zufallsgenerator</h1>
+                <span>
+                    Zufallszahl von
+                    <input
+                        id="start-input"
+                        type="number"
+                        max="255"
+                        min="0"
+                        value="1"
+                    />
+                    bis
+                    <input
+                        id="stop-input"
+                        type="number"
+                        max="255"
+                        min="0"
+                        value="6"
+                    />: <span id="random-number"></span>.
+                    <button onclick="submit()">
+                        <i data-feather="refresh-cw"></i>
+                    </button>
+                </span>
+            </div>
+            <footer class="center-container">
+                <div>
+                    <span>Piro E. Bakallbashi</span>
+                    <span>Benedikt C. Mues</span>
+                </div>
+                <div>
+                    <span>Copyright 2026 | All Rights Reserved</span>
+                </div>
+            </footer>
+        </div>
+        <script>
+            feather.replace();
+        </script>
+    </body>
+</html>
