@@ -8,8 +8,7 @@ Es wurde ein Zufallszahlengenerator gebaut, der die Zeitintervalle zwischen radi
 
 ## Verwendung
 Der Quellcode dieses Projekts ist hauptsächlich in `server/src/I2B.h` zu finden. `server/src/server.cpp` beinhält einen HTTP-Server, mit
-welchem man Bytes abfragen kann. Der server kann durch `sudo make run` in dem `server` Verzeichnis auf einem Raspberry Pi gestartet werden
-kann.
+welchem man Bytes abfragen kann. Der server kann durch `sudo make run` in dem `server` Verzeichnis auf einem Raspberry Pi gestartet werden.
 
 `include/` enthält C++-Bibliotheken.
 
